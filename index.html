@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>漢文句形 四択テスト</title>
+<style>
+body {
+font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+background-color: #f0f4f8;
+color: #333;
+text-align: center;
+padding: 20px;
+margin: 0;
+}
+h1 {
+color: #2c3e50;
+}
+.container {
+max-width: 600px;
+margin: 0 auto;
+background: #fff;
+padding: 30px;
+border-radius: 10px;
+box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.hidden {
+display: none !important;
+}
+select, button {
+font-size: 16px;
+padding: 10px 20px;
+margin: 10px;
+border-radius: 5px;
+border: 1px solid #ccc;
+}
+button {
+background-color: #3498db;
+color: white;
+border: none;
+cursor: pointer;
+transition: background 0.3s;
+}
+button:hover {
+background-color: #2980b9;
+}
+.choice-btn {
+display: block;
+width: 100%;
+margin: 10px 0;
+background-color: #ecf0f1;
+color: #2c3e50;
+border: 2px solid #bdc3c7;
+text-align: left;
+}
+.choice-btn:hover {
+background-color: #d5dbdb;
+}
+.choice-btn.correct {
+background-color: #2ecc71;
+color: white;
+border-color: #27ae60;
+}
+.choice-btn.wrong {
+background-color: #e74c3c;
+color: white;
+border-color: #c0392b;
+}
+#question-word {
+font-size: 32px;
+font-weight: bold;
+margin: 20px 0;
+color: #e67e22;
+}
+#yomi-hint {
+font-size: 18px;
+color: #7f8c8d;
+margin-bottom: 20px;
+}
+.stats {
+display: flex;
+justify-content: space-between;
+font-weight: bold;
+margin-bottom: 20px;
+border-bottom: 2px solid #eee;
+padding-bottom: 10px;
+}
+</style>
+</head>
+<body>
+<div class="container" id="start-screen">
+<h1>漢文句形 四択テスト</h1>
+<p>限定形から願望形まで（81〜106番）</p>
+<div>
+<label for="question-count">出題数: </label>
+<select id="question-count">
+<option value="10">10問</option>
+<option value="20">20問</option>
+<option value="all">すべて</option>
+</select>
+</div>
+<button id="start-btn">テストを開始する</button>
+</div>
+<div class="container hidden" id="quiz-screen">
+<div class="stats">
+<span id="progress-text">問題: 1 / 10</span>
+<span id="score-text">スコア: 0</span>
+</div>
+<div id="question-word">漢字</div>
+<div id="yomi-hint">読み</div>
+<div id="choices-container">
+</div>
+</div>
+<div class="container hidden" id="result-screen">
+<h1>テスト終了！</h1>
+<h2 id="final-score">正解数: 0 / 10</h2>
+<div id="feedback-list" style="text-align: left; margin-bottom: 20px; max-height: 300px;
+overflow-y: auto;">
+</div>
+<button id="restart-btn">最初からやり直す</button>
+</div>
+<script>
+// 書き出した句形データ
+const rawData = [
+{ id: 81, kanji: "唯・但・只・徒・祇・特", yomi: "ただ～ノミ", meaning: "ただ～だけ" },
+{ id: 82, kanji: "独", yomi: "ひとり～ノミ", meaning: "ただ～だけ" },
+{ id: 83, kanji: "耳〔已・而已・而已矣・爾〕", yomi: "――ノミ", meaning: "――だけだ。" },
+{ id: 85, kanji: "不唯〔独〕", yomi: "ただニ〔ひとり〕――ノミナラず", meaning: "ただ――だけ
+ではない。" },
+{ id: 86, kanji: "非唯〔独〕", yomi: "ただニ〔ひとり〕――ノミニアラず", meaning: "ただ――だ
+けではない。" },
+{ id: 87, kanji: "豈唯〔徒〕", yomi: "あにただニ――ノミナランヤ", meaning: "どうしてただ
+――だけだろうか、いや、――だけではない。" },
+{ id: 88, kanji: "何独", yomi: "なんぞひとり――ノミナランヤ", meaning: "どうしてただ――
+だけだろうか、いや、――だけではない。" },
+{ id: 89, kanji: "A 於〔于・乎〕B", yomi: "AハBヨリ(モ)〔C〕ナリ", meaning: "AはBよりもCだ。
+" },
+{ id: 90, kanji: "A 不如〔若〕 B", yomi: "AハBニしかず", meaning: "AはBに及ばない。" },
+{ id: 91, kanji: "莫如〔若〕 A", yomi: "Aニしくハなし", meaning: "Aに及ぶもの〔こと〕はない。
+" },
+{ id: 92, kanji: "莫 B 於〔于・乎〕 A", yomi: "AヨリBナルハなし", meaning: "AよりBなもの〔こ
+と〕はない。" },
+{ id: 93, kanji: "莫 A 焉", yomi: "これヨリAナルハなし", meaning: "これよりAなもの〔こと〕は
+ない。" },
+{ id: 94, kanji: "寧 A、無 レ B", yomi: "むしろA〔ス〕トモ、B〔スル〕(コト)なカレ", meaning: "
+いっそ〔むしろ〕Aしても、Bするな。" },
+{ id: 95, kanji: "A 孰与〔孰若〕 B", yomi: "AハBニいづレゾ", meaning: "AはBと比べてどう
+か。" },
+{ id: 96, kanji: "与其 A、寧 B", yomi: "そのA〔セ〕ンヨリハ、むしろB〔セヨ〕", meaning: "Aす
+るよりは、Bする方がよい。" },
+{ id: 97, kanji: "与其 A、不如 B", yomi: "そのA〔セ〕ンヨリハ、B〔スル〕ニしかず", meaning:
+"Aするよりは、Bする方がよい。" },
+{ id: 98, kanji: "与其 A、孰若 B", yomi: "そのA〔セ〕ンヨリハ、B〔スル〕ニいづレゾ",
+meaning: "Aするよりは、Bする方がよいのではないか。" },
+{ id: 99, kanji: "如〔若〕", yomi: "――ノごとシ", meaning: "――のようだ。――のようなもの
+だ。" },
+{ id: 100, kanji: "似", yomi: "――ニにタリ", meaning: "――のようだ。――のようなものだ。"
+},
+{ id: 101, kanji: "A ハ B。況 C 乎。", yomi: "AハB。いハんヤCヲや。", meaning: "AはBだ。
+ましてCの場合はなおさら(B)だ。" },
+{ id: 102, kanji: "A 且〔尚・猶〕 B。況 C 乎。", yomi: "Aスラかツ〔なホ〕B。いハんヤCヲや。",
+meaning: "AでさえBだ。ましてCの場合はなおさら(B)だ。" },
+{ id: 103, kanji: "A 且〔尚・猶〕 B。(C) 安 D 乎。", yomi: "Aスラかツ〔なホ〕B。(C)いづクンゾ
+D〔セ〕ンヤ。", meaning: "AでさえBだ。(Cなど)どうしてDしようか、いや、Dしない。" },
+{ id: 104, kanji: "請", yomi: "こフ――〔セ〕ン / 〔セヨ〕", meaning: "どうか――させてください
+/ してください。" },
+{ id: 105, kanji: "願", yomi: "ねがハクハ――〔セ〕ン / 〔セヨ〕", meaning: "どうか――させて
+ください / してください。" },
+{ id: 106, kanji: "庶幾〔庶・冀〕", yomi: "こひねがハクハ――〔セ〕ン / 〔セヨ〕", meaning: "ど
+うか――させてください / してください。" }
+];
+let quizData = [];
+let currentQuestionIndex = 0;
+let score = 0;
+let isAnswering = false;
+let mistakes = [];
+// DOM要素の取得
+const startScreen = document.getElementById('start-screen');
+const quizScreen = document.getElementById('quiz-screen');
+const resultScreen = document.getElementById('result-screen');
+const startBtn = document.getElementById('start-btn');
+const restartBtn = document.getElementById('restart-btn');
+const questionCountSelect = document.getElementById('question-count');
+const progressText = document.getElementById('progress-text');
+const scoreText = document.getElementById('score-text');
+const questionWord = document.getElementById('question-word');
+const yomiHint = document.getElementById('yomi-hint');
+const choicesContainer = document.getElementById('choices-container');
+const finalScore = document.getElementById('final-score');
+const feedbackList = document.getElementById('feedback-list');
+// 配列のシャッフル関数
+function shuffleArray(array) {
+const arr = [...array];
+for (let i = arr.length - 1; i > 0; i--) {
+const j = Math.floor(Math.random() * (i + 1));
+[arr[i], arr[j]] = [arr[j], arr[i]];
+}
+return arr;
+}
+// テスト開始処理
+startBtn.addEventListener('click', () => {
+let count = questionCountSelect.value;
+let shuffledData = shuffleArray(rawData);
+if (count === 'all') {
+quizData = shuffledData;
+} else {
+quizData = shuffledData.slice(0, parseInt(count));
+}
+currentQuestionIndex = 0;
+score = 0;
+mistakes = [];
+startScreen.classList.add('hidden');
+resultScreen.classList.add('hidden');
+quizScreen.classList.remove('hidden');
+showQuestion();
+});
+// 問題の表示
+function showQuestion() {
+isAnswering = true;
+const currentData = quizData[currentQuestionIndex];
+progressText.textContent = `問題: ${currentQuestionIndex + 1} / ${quizData.length}`;
+scoreText.textContent = `スコア: ${score}`;
+// 漢字と読みを表示し、意味を問う形式
+questionWord.textContent = currentData.kanji;
+yomiHint.textContent = `[読] ${currentData.yomi}`;
+choicesContainer.innerHTML = '';
+// 正解とダミー選択肢の作成
+let choices = [currentData.meaning];
+let otherMeanings = rawData.filter(d => d.meaning !== currentData.meaning).map(d =>
+d.meaning);
+otherMeanings = shuffleArray(otherMeanings);
+// ダミーを3つ追加 (重複を避ける)
+let uniqueDummies = [...new Set(otherMeanings)].slice(0, 3);
+choices = choices.concat(uniqueDummies);
+choices = shuffleArray(choices);
+choices.forEach(choiceText => {
+const btn = document.createElement('button');
+btn.className = 'choice-btn';
+btn.textContent = choiceText;
+btn.addEventListener('click', () => checkAnswer(btn, choiceText, currentData));
+choicesContainer.appendChild(btn);
+});
+}
+// 答え合わせ処理
+function checkAnswer(clickedBtn, selectedText, currentData) {
+if (!isAnswering) return;
+isAnswering = false;
+const buttons = choicesContainer.querySelectorAll('.choice-btn');
+const isCorrect = (selectedText === currentData.meaning);
+if (isCorrect) {
+clickedBtn.classList.add('correct');
+score++;
+} else {
+clickedBtn.classList.add('wrong');
+mistakes.push(currentData);
+// 正解のボタンを緑色にする
+buttons.forEach(btn => {
+if (btn.textContent === currentData.meaning) {
+btn.classList.add('correct');
+}
+});
+}
+scoreText.textContent = `スコア: ${score}`;
+// 1.5秒後に次の問題へ
+setTimeout(() => {
+currentQuestionIndex++;
+if (currentQuestionIndex < quizData.length) {
+showQuestion();
+} else {
+showResult();
+}
+}, 1500);
+}
+// 結果画面の表示
+function showResult() {
+quizScreen.classList.add('hidden');
+resultScreen.classList.remove('hidden');
+finalScore.textContent = `正解数: ${score} / ${quizData.length}`;
+feedbackList.innerHTML = '';
+if (mistakes.length > 0) {
+const h3 = document.createElement('h3');
+h3.textContent = '【間違えた問題の復習】';
+feedbackList.appendChild(h3);
+mistakes.forEach(m => {
+const p = document.createElement('p');
+p.style.borderBottom = '1px solid #ccc';
+p.style.paddingBottom = '5px';
+p.innerHTML = `<strong>${m.kanji}</strong><br><span style="color:#7f8c8d;
+font-size:14px;">読: ${m.yomi}</span><br><span style="color:#e74c3c; font-size:14px;">意:
+${m.meaning}</span>`;
+feedbackList.appendChild(p);
+});
+} else {
+feedbackList.innerHTML = '<p style="color:#27ae60; font-weight:bold;">全問正解で
+す！素晴らしい！</p>';
+}
+}
+// 最初からやり直す
+restartBtn.addEventListener('click', () => {
+resultScreen.classList.add('hidden');
+startScreen.classList.remove('hidden');
+});
+</script>
+</body>
+</html>
